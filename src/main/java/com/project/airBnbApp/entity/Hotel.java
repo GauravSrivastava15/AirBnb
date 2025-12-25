@@ -8,6 +8,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -42,6 +43,12 @@ public class Hotel {
     @Column(nullable = false)
     private Boolean active;
 
+//    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
+    private User owner;
+
+    @OneToMany(mappedBy = "hotel")
+    private List<Room> rooms;
 }
 
 //contact_info_address
