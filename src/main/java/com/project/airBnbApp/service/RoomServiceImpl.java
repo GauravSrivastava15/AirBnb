@@ -69,8 +69,7 @@ public class RoomServiceImpl implements RoomService{
                 findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: " + roomId));
 
-        //ERROR here as inventory service should stop and we should not move to room repository; we should stop the thread
-        inventoryService.deleteFutureInventories(room);
+        inventoryService.deleteAllInventories(room);
 
         roomRepository.deleteById(roomId);
 
