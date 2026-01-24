@@ -45,7 +45,7 @@ public class Hotel {
     private Boolean active;
 
 //    @ManyToOne(fetch = FetchType.LAZY)
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(optional = false)
     private User owner;
 
     @OneToMany(mappedBy = "hotel")

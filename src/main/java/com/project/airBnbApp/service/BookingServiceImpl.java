@@ -3,6 +3,7 @@ package com.project.airBnbApp.service;
 import com.project.airBnbApp.dto.BookingDto;
 import com.project.airBnbApp.dto.BookingRequest;
 import com.project.airBnbApp.dto.GuestDto;
+import com.project.airBnbApp.dto.HotelReportDto;
 import com.project.airBnbApp.entity.*;
 import com.project.airBnbApp.entity.enums.BookingStatus;
 import com.project.airBnbApp.exception.ResourceNotFoundException;
@@ -19,17 +20,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.ModelMap;
 
 import java.awt.print.Book;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.project.airBnbApp.util.AppUtils.getCurrentUser;
 
 @Service
 @Slf4j
@@ -251,11 +258,63 @@ public class BookingServiceImpl implements BookingService{
         return booking.getBookingStatus().name();
     }
 
+    @Override
+    public List<BookingDto> getAllBookingsByHotelId(Long hotelId) {
+        Hotel hotel = hotelRepository.findById(hotelId).
+                orElseThrow(() -> new ResourceNotFoundException("Hotel with not found with id " + hotelId));
+
+        User user = getCurrentUser();
+
+        log.info("Getting all bookings of hotel with ID: {}", hotelId);
+
+        if(!user.equals(hotel.getOwner())){
+            throw new AccessDeniedException("You are not the owner of the hotel with id "+ hotelId);
+        }
+
+        List<Booking> bookings = bookingRepository.findByHotel(hotel);
+        return bookings
+                .stream()
+                .map(booking -> modelMapper.map(booking, BookingDto.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public HotelReportDto getHotelReport(Long hotelId, LocalDate startDate, LocalDate endDate) {
+        Hotel hotel = hotelRepository.findById(hotelId).
+                orElseThrow(() -> new ResourceNotFoundException("Hotel with not found with id " + hotelId));
+
+        User user = getCurrentUser();
+
+        log.info("Generating report for hotel with ID: {}", hotelId);
+
+        if(!user.equals(hotel.getOwner())){
+            throw new AccessDeniedException("You are not the owner of the hotel with id "+ hotelId);
+        }
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        List<Booking> bookings = bookingRepository.findByHotelAndCreatedAtBetween(hotel, startDateTime, endDateTime);
+
+        Long totalConfirmedBookings = bookings.stream()
+                .filter(booking -> booking.getBookingStatus() == BookingStatus.CONFIRMED)
+                .count();
+
+        BigDecimal totalRevenueOfConfirmedBooking = bookings.stream()
+                .filter(booking -> booking.getBookingStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal avgRevenue = totalConfirmedBookings == 0 ? BigDecimal.ZERO :
+                totalRevenueOfConfirmedBooking.divide(BigDecimal.valueOf(totalConfirmedBookings), RoundingMode.HALF_DOWN);
+
+        return new HotelReportDto(totalConfirmedBookings, totalRevenueOfConfirmedBooking, avgRevenue);
+    }
+
+
     public boolean hasBookingExpired(Booking booking){
         return booking.getCreatedAt().plusMinutes(10).isBefore(LocalDateTime.now());
     }
 
-    public User getCurrentUser(){
-        return  (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    }
+
 }
