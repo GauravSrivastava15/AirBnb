@@ -111,7 +111,7 @@ public class RoomServiceImpl implements RoomService{
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id " + roomId));
 
-        modelMapper.map(room, roomDto);
+        modelMapper.map(roomDto, room);
         room.setId(roomId);
         room = roomRepository.save(room);
 
